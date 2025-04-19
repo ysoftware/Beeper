@@ -101,7 +101,7 @@ int main(void) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     SetConfigFlags(FLAG_VSYNC_HINT);
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Proxy");
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Beeper");
     SetTargetFPS(0);
     SetExitKey(KEY_NULL);
 
