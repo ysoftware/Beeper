@@ -1,0 +1,8 @@
+-Iinclude
+-Isrc
+-pedantic
+-Wall
+-Wextra
+-limit
+-debug
+-Ilib/raylib-5.5/src

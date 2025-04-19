@@ -1,0 +1,17 @@
+build/*
+*.app
+*.obj
+*.exe
+*.dSYM/*
+*.dll
+*.vcxproj*
+*.sln
+*.lib
+*.exp
+*.o
+*.tmp
+
+lib/raylib*/*.cmake
+lib/raylib*/Makefile
+lib/raylib*/examples
+lib/raylib*/raylib/*
