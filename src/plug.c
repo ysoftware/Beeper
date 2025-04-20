@@ -11,6 +11,8 @@
 #define NUMBER_OF_CHANNELS 2
 #define SAMPLE_RATE 44100
 
+#define FRAMES_PER_SETTING (SAMPLE_RATE / 5)
+
 typedef struct {
     size_t element_id;
     Vector2 initial_value;
@@ -18,12 +20,23 @@ typedef struct {
 } DraggingState;
 
 typedef struct {
+    float wave1;
+    float wave2;
+    float wave3;
+} Setting;
+
+typedef struct {
+    float wave1;
+    float wave2;
+    float wave3;
+} Phases;
+
+typedef struct {
     ma_device audio_device;
 
-    float freq1;
-    float freq2;
-    float carrier_phase;
-    float modulator_phase;
+    Setting *settings;
+    size_t settings_count;
+    Phases phases;
 
     DraggingState dragging_state;
 
@@ -49,19 +62,30 @@ void audio_callback(ma_device *device, void *output, const void *input, ma_uint3
     }
 
     for (size_t i = 0; i < frame_count; i++) {
-        float carrier = sinf(state->carrier_phase);
-        float modulator = sinf(state->modulator_phase) * 0.5f + 0.5f;
-        float value = carrier * modulator;
+        float signal1 = sinf(state->phases.wave1);
+        float signal2 = sinf(state->phases.wave2) * 0.5f + 0.5f;
+        float signal3 = sinf(state->phases.wave3) * 0.5f + 0.5f;
+        float value = signal1 * signal2;
 
-        for (int s = 0; s < NUMBER_OF_CHANNELS; s++) {
-            ((float*)output)[i * NUMBER_OF_CHANNELS + s] = value;
-        }
+        // set output for both channels
+        ((float*)output)[i * NUMBER_OF_CHANNELS + 0] = value;
+        ((float*)output)[i * NUMBER_OF_CHANNELS + 1] = value;
 
-        state->carrier_phase += 2.0f * PI * state->freq1 / SAMPLE_RATE;
-        state->modulator_phase += 2.0f * PI * state->freq2 / SAMPLE_RATE;
+        int setting_position = ((state->playback_frame_counter + i) / FRAMES_PER_SETTING) % state->settings_count;
+        Setting setting_this_frame = state->settings[setting_position];
 
-        if (state->carrier_phase >= 2.0f * PI) state->carrier_phase -= 2.0f * PI;
-        if (state->modulator_phase >= 2.0f * PI) state->modulator_phase -= 2.0f * PI;
+        // waves formula
+        float wave1 = setting_this_frame.wave1 * signal3;
+        float wave2 = setting_this_frame.wave2;
+        float wave3 = setting_this_frame.wave3;
+
+        state->phases.wave1 += 2.0f * PI * wave1 / SAMPLE_RATE;
+        state->phases.wave2 += 2.0f * PI * wave2 / SAMPLE_RATE;
+        state->phases.wave3 += 2.0f * PI * wave3 / SAMPLE_RATE;
+
+        if (state->phases.wave1 >= 2.0f * PI) state->phases.wave1 -= 2.0f * PI;
+        if (state->phases.wave2 >= 2.0f * PI) state->phases.wave2 -= 2.0f * PI;
+        if (state->phases.wave3 >= 2.0f * PI) state->phases.wave3 -= 2.0f * PI;
     }
 
     state->playback_frame_counter += frame_count;
@@ -108,7 +132,7 @@ bool HandleDragging(Vector2 *output, DraggingState *dragging_state, size_t eleme
     return false;
 }
 
-bool DrawSlider(float from, float to, float step, float *value, int element_id, Rectangle frame) {
+bool DrawSlider(float from, float to, float step, float *value, int element_id, Rectangle frame, Color color) {
     assert(to > from);
     assert(step >= 0);
     assert(value != NULL);
@@ -138,7 +162,7 @@ bool DrawSlider(float from, float to, float step, float *value, int element_id, 
     Rectangle selected_frame = frame;
     selected_frame.width = active_width;
     selected_frame.width *= progress;
-    DrawRectangleRec(selected_frame, BLUE);
+    DrawRectangleRec(selected_frame, color);
 
     Rectangle notch_frame = frame;
     notch_frame.width = notch_size;
@@ -153,14 +177,114 @@ bool DrawSlider(float from, float to, float step, float *value, int element_id, 
     return is_dragging;
 }
 
+#define ADD(s1, s2, s3) state->settings[c++] = (Setting) { s1, s2, s3 };
+
+void setup_settings(void) {
+    if (state->settings != NULL) {
+        free(state->settings);
+        state->settings = NULL;
+    }
+    state->settings_count = 64;
+    state->settings = malloc(state->settings_count * sizeof(Setting));
+
+    size_t c = 0;
+
+    // 0
+
+    ADD(200, 0, 60);
+    ADD(200, 0, 70);
+    ADD(200, 0, 80);
+    ADD(100, 0, 900);
+
+    ADD(0,   0, 40);
+    ADD(0,   0, 40);
+    ADD(400, 0, 9);
+    ADD(100, 0, 9);
+
+    ADD(200, 0, 600);
+    ADD(200, 0, 70);
+    ADD(200, 0, 80);
+    ADD(900, 0, 0);
+
+    ADD(200, 0, 0);
+    ADD(100, 0, 0);
+    ADD(600, 0, 0);
+    ADD(0,   0, 0);
+
+    // 16
+
+    ADD(200, 0, 600);
+    ADD(200, 0, 700);
+    ADD(200, 0, 80);
+    ADD(100, 0, 90);
+
+    ADD(0,   0, 0);
+    ADD(0,   0, 0);
+    ADD(400, 0, 0);
+    ADD(100, 0, 0);
+
+    ADD(200, 0, 600);
+    ADD(200, 0, 700);
+    ADD(200, 0, 80);
+    ADD(200, 0, 90);
+
+    ADD(200, 0, 0);
+    ADD(100, 0, 0);
+    ADD(400, 0, 0);
+    ADD(0,   0, 0);
+
+    // 32
+
+    ADD(200, 0, 60);
+    ADD(200, 0, 70);
+    ADD(200, 0, 80);
+    ADD(100, 0, 900);
+
+    ADD(0,   0, 0);
+    ADD(0,   0, 0);
+    ADD(400, 0, 900);
+    ADD(100, 0, 900);
+
+    ADD(200, 0, 600);
+    ADD(200, 0, 70);
+    ADD(200, 0, 80);
+    ADD(900, 0, 0);
+
+    ADD(200, 0, 0);
+    ADD(100, 0, 0);
+    ADD(600, 0, 0);
+    ADD(0,   0, 0);
+
+    // 48
+
+    ADD(200, 0, 600);
+    ADD(200, 0, 700);
+    ADD(200, 0, 80);
+    ADD(100, 0, 90);
+
+    ADD(0,   0, 40);
+    ADD(0,   0, 40);
+    ADD(400, 0, 9);
+    ADD(100, 0, 9);
+
+    ADD(200, 0, 600);
+    ADD(200, 0, 700);
+    ADD(200, 0, 80);
+    ADD(200, 0, 90);
+
+    ADD(200, 0, 400);
+    ADD(100, 0, 400);
+    ADD(400, 0, 400);
+    ADD(0,   0, 0);
+}
+
 // PLUGIN
 
 void plug_init(void) {
     state = malloc(sizeof(*state));
     memset(state, 0, sizeof(*state));
 
-    state->freq1 = 600;
-    state->freq2 = 1;
+    setup_settings();
 
     init_audio_device();
     SetExitKey(KEY_Q);
@@ -174,12 +298,14 @@ void plug_cleanup(void) {
 
 void *plug_pre_reload(void) {
     ma_device_uninit(&state->audio_device);
+    state->is_playing_sound = false;
     return state;
 }
 
 void plug_post_reload(void *old_state) {
     state = old_state;
     init_audio_device();
+    setup_settings();
 }
 
 void plug_update(void) {
@@ -190,26 +316,57 @@ void plug_update(void) {
 
     if (IsKeyPressed(KEY_SPACE)) {
         state->is_playing_sound = !state->is_playing_sound;
-        if (state->is_playing_sound) state->playback_frame_counter = 0;
+        if (state->is_playing_sound) {
+            state->playback_frame_counter = 0;
+            state->phases = (Phases) {0};
+        }
     }
 
-    float carrier = sinf(state->carrier_phase) * 0.5f + 0.5f;
-    float modulator = sinf(state->modulator_phase) * 0.5f + 0.5f;
+    int setting_position = (state->playback_frame_counter / FRAMES_PER_SETTING) % state->settings_count;
+    Setting setting_this_frame = state->settings[setting_position];
 
-    Rectangle rec = { 200+400*modulator, 200+400*carrier, 50, 50 };
-    Color color = { 255, 0, 0, 255 };
+    float signal1 = sinf(state->phases.wave1) * 0.5f + 0.5f;
+    float signal2 = sinf(state->phases.wave2) * 0.5f + 0.5f;
+
+    Rectangle rec = { 200+400*signal1, 200+400*signal2, 50, 50 };
+    Color color = { signal1*255, signal2*255, 0, 255 };
     DrawRectangleRec(rec, color);
 
-    const int slider_width = 600;
+    sprintf(text, "signal1 %f", signal1);
+    DrawText(text, 20, GetScreenHeight() - 50, 20, WHITE);
 
-    DrawSlider(1, 200, 1, &state->freq1, 1, ((Rectangle) { 10, 10, slider_width, 10 }));
-    DrawSlider(1, 200, 1, &state->freq2, 2, ((Rectangle) { 10, 40, slider_width, 10 }));
+    const int slider_width = 800;
+    int y = 10;
 
-    sprintf(text, "%.0f Hz", state->freq1);
-    DrawText(text, slider_width + 20, 10, 20, WHITE);
+    DrawSlider(0, 800, 1, &setting_this_frame.wave1, 1, ((Rectangle) { 10, y, slider_width, 10 }), BLUE);
+    sprintf(text, "%.0f Hz", setting_this_frame.wave1);
+    DrawText(text, slider_width + 20, y, 20, WHITE);
+    y += 15;
+    DrawSlider(0, 2*PI, 1, &state->phases.wave1, 1, ((Rectangle) { 10, y, slider_width, 10 }), YELLOW);
+    sprintf(text, "%.3f", state->phases.wave1/(2*PI));
+    DrawText(text, slider_width + 20, y, 20, WHITE);
+    y += 40;
 
-    sprintf(text, "%.0f Hz", state->freq2);
-    DrawText(text, slider_width + 20, 40, 20, WHITE);
+    DrawSlider(0, 10, 1, &setting_this_frame.wave2, 1, ((Rectangle) { 10, y, slider_width, 10 }), BLUE);
+    sprintf(text, "%.0f Hz", setting_this_frame.wave2);
+    DrawText(text, slider_width + 20, y, 20, WHITE);
+    y += 15;
+    DrawSlider(0, 2*PI, 1, &state->phases.wave2, 1, ((Rectangle) { 10, y, slider_width, 10 }), YELLOW);
+    sprintf(text, "%.3f", state->phases.wave2/(2*PI));
+    DrawText(text, slider_width + 20, y, 20, WHITE);
+    y += 40;
+
+    DrawSlider(0, 900, 1, &setting_this_frame.wave3, 1, ((Rectangle) { 10, y, slider_width, 10 }), BLUE);
+    sprintf(text, "%.0f Hz", setting_this_frame.wave3);
+    DrawText(text, slider_width + 20, y, 20, WHITE);
+    y += 15;
+    DrawSlider(0, 2*PI, 1, &state->phases.wave3, 1, ((Rectangle) { 10, y, slider_width, 10 }), YELLOW);
+    sprintf(text, "%.3f", state->phases.wave3/(2*PI));
+    DrawText(text, slider_width + 20, y, 20, WHITE);
+    y += 40;
+
+    sprintf(text, "Setting %d", setting_position);
+    DrawText(text, 20, GetScreenHeight() - 30, 20, WHITE);
 
     DrawFPS(GetScreenWidth() - 100, GetScreenHeight() - 30);
 
