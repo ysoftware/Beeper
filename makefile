@@ -16,7 +16,7 @@ ifeq ($(shell uname), Linux)
 	plug_name  := libplug.so
 	dynamic    := 
 	compiler   := clang $(compflags) -Iinclude -pedantic -ggdb3 -g -O0
-	frameworks := -lGL -lm -lpthread -ldl -lrt -lX11 -lz -lpng -lbz2
+	frameworks := -lGL -lm -lpthread -ldl -lrt -lX11
 	
 	target_version      := 
 	target_version_flag := 
@@ -30,21 +30,12 @@ else # macos
 	target_version_flag := "-mmacosx-version-min=14.7"
 
 	f := -framework
-	ifeq ($(RENDERER), raylib)
-		frameworks := $(f) CoreAudio     $(f) OpenGL       $(f) AudioToolbox   $(f) AudioUnit \
-					  $(f) CoreServices  $(f) Carbon       $(f) CoreVideo      $(f) IOKit \
-					  $(f) Cocoa         $(f) GLUT         $(f) CoreFoundation $(f) AppKit
-	else ifeq ($(RENDERER), sdl)
-		frameworks := $(f) CoreAudio     $(f) OpenGL       $(f) AudioToolbox   $(f) AudioUnit \
-					  $(f) CoreServices  $(f) Carbon       $(f) CoreVideo      $(f) IOKit \
-					  $(f) Cocoa         $(f) GLUT         $(f) CoreFoundation $(f) AppKit \
-					  $(f) AVFoundation  $(f) CoreMedia    $(f) Metal          $(f) CoreHaptics \
-					  $(f) ForceFeedback $(f) CoreGraphics $(f) GameController $(f) QuartzCore \
-					  $(f) UniformTypeIdentifiers  -lbz2 -lz -L/opt/homebrew/lib -lpng
-	endif
+	frameworks := $(f) CoreAudio     $(f) OpenGL       $(f) AudioToolbox   $(f) AudioUnit \
+				  $(f) CoreServices  $(f) Carbon       $(f) CoreVideo      $(f) IOKit \
+				  $(f) Cocoa         $(f) GLUT         $(f) CoreFoundation $(f) AppKit
 endif
 
-all: build main.app build/libplug.so test.app
+all: build main.app build/libplug.so
 
 clean_all:
 	@echo $(nproc)
@@ -66,17 +57,15 @@ build/libraylib.a:
 	cd $(raylib) && make raylib $(jobs)
 	cp $(raylib)/raylib/libraylib.a $(raylib_l)
 
-main.app build/$(plug_name): $(all_l) $(renderer_files) src/*
+main.app: src/main.c
+	$(compiler) $(warnings) -rdynamic -o main.app src/main.c $(all_i) $(renderer_l) $(frameworks)
+
+build/$(plug_name): $(all_l) $(renderer_files) src/*
 	make build
 	touch build/libplug.lock
 	$(compiler) $(warnings) $(all_i) -fPIC -c src/plug.c -o build/plug.o
 	$(compiler) $(warnings) $(dynamic) -shared -o build/$(plug_name) build/plug.o $(all_l) $(frameworks)
 	rm build/libplug.lock
-	$(compiler) $(warnings) -rdynamic -o main.app src/main.c $(all_i) $(renderer_l) $(frameworks)
 
 dependencies:
 	gcc src/plug.c -o main -MD -Iinclude $(all_i) $(all_l) $(frameworks)
-
-test.app: test/*
-	make build
-	$(compiler) $(warnings) -o test.app test/test.c
