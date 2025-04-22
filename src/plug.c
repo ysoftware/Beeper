@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "raylib.h"
-#include "raymath.h"
 
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
@@ -39,6 +38,11 @@ typedef struct {
 } Track;
 
 typedef struct {
+    float track3_target;
+    float track3_value;
+} UI;
+
+typedef struct {
     ma_device audio_device;
 
     Track track1;
@@ -46,7 +50,7 @@ typedef struct {
     Track track3;
     size_t settings_count;
 
-    DraggingState dragging_state;
+    UI ui;
 
     bool is_playing_sound;
     size_t playback_frame_counter;
@@ -93,7 +97,7 @@ float track1_produce_sample(Track *track, int setting_position) {
 
 float track2_produce_sample(Track *track, int setting_position) {
     float signal1 = sine_wave(track->phases.wave1);
-    float signal2 = sinf(track->phases.wave2) * 0.5f + 0.5f;
+    float signal2 = square_wave(track->phases.wave2) * 0.5f + 0.5f;
     float value = signal1 * signal2;
 
     // produce next phase value
@@ -115,7 +119,7 @@ float track2_produce_sample(Track *track, int setting_position) {
 
 float track3_produce_sample(Track *track, int setting_position) {
     float signal1 = triangle_wave(track->phases.wave1);
-    float signal2 = sinf(track->phases.wave2) * 0.5f + 0.5f;
+    float signal2 = sine_wave(track->phases.wave2) * 0.5f + 0.5f;
     float value = signal1 * signal2;
 
     // produce next phase value
@@ -157,7 +161,7 @@ void audio_callback(ma_device *device, void *output, const void *input, ma_uint3
 
         float value = 0;
         value += track1_produce_sample(&state->track1, setting_position) * 0.4f;
-        value += track2_produce_sample(&state->track2, setting_position) * 0.1f;
+        value += track2_produce_sample(&state->track2, setting_position) * 0.2f;
         value += track3_produce_sample(&state->track3, setting_position) * 0.9f;
 
         ((float*)output)[i * NUMBER_OF_CHANNELS + 0] = value;
@@ -184,80 +188,10 @@ void init_audio_device(void) {
     printf("Audio device initialized and started.\n");
 }
 
-// UI
-
-bool is_hovering(Rectangle frame) {
-    Vector2 mouse_position = GetMousePosition();
-    return CheckCollisionPointRec(mouse_position, frame);
-}
-
-bool HandleDragging(Vector2 *output, DraggingState *dragging_state, size_t element_id, bool is_hovering_draggable_element) {
-    assert(element_id != 0);
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && dragging_state->element_id == 0 && is_hovering_draggable_element) {
-        dragging_state->element_id = element_id;
-        dragging_state->initial_value = *output;
-        dragging_state->initial_mouse_position = GetMousePosition();
-    }
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && dragging_state->element_id == element_id) {
-        *output = Vector2Add(Vector2Subtract(dragging_state->initial_value, GetMousePosition()), dragging_state->initial_mouse_position);
-        return true;
-    }
-    if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT) && dragging_state->element_id == element_id) {
-        dragging_state->element_id = 0;
-    }
-    return false;
-}
-
-bool DrawSlider(float from, float to, float step, float *value, int element_id, Rectangle frame, Color color) {
-    assert(to > from);
-    assert(step >= 0);
-    assert(value != NULL);
-
-    float notch_size = frame.height;
-
-    bool is_hovering_slider = is_hovering(frame);
-    Vector2 dragging_output = (Vector2) { .y = 0 };
-    bool is_dragging = HandleDragging(&dragging_output, &state->dragging_state, element_id, is_hovering_slider);
-
-    float progress = 0;
-    float active_x = frame.x + (float)10/2;
-    float active_width = frame.width - 10;
-
-    if (is_dragging) {
-        float dragging_progress = fmax(0, fmin(1, (-(dragging_output.x - state->dragging_state.initial_mouse_position.x) - active_x) / active_width));
-        float new_value = from + ((to - from) * dragging_progress);
-        new_value -= fmod(new_value, step);
-        *value = new_value;
-        progress = (new_value - from) / (to - from);
-    } else {
-        progress = (*value - from) / (to - from);
-    }
-
-    DrawRectangleRec(frame, DARKGRAY);
-
-    Rectangle selected_frame = frame;
-    selected_frame.width = active_width;
-    selected_frame.width *= progress;
-    DrawRectangleRec(selected_frame, color);
-
-    Rectangle notch_frame = frame;
-    notch_frame.width = notch_size;
-    notch_frame.x = active_x + selected_frame.width - notch_size / 2;
-
-    if (is_dragging) {
-        DrawRectangleRec(notch_frame, WHITE);
-    } else {
-        DrawRectangleRec(notch_frame, WHITE);
-    }
-
-    return is_dragging;
-}
-
 #define SET(s1, s2, s3) current_track->settings[c++] = (Setting) { s1, s2, s3 };
 
 void setup_settings(void) {
-    state->settings_count = 64;
+    state->settings_count = 128;
 
     if (state->track1.settings != NULL) {
         free(state->track1.settings);
@@ -277,6 +211,13 @@ void setup_settings(void) {
     state->track1.settings = malloc(state->settings_count * sizeof(Setting));
     assert(current_track->settings != NULL && "Uninitialized");
     size_t c = 0;
+
+    for (int i = 0; i < 4; i++) {
+        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
+        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
+        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
+        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
+    }
 
     SET(200, 0, 60);   SET(200, 0, 70);   SET(200, 0, 80);  SET(100, 0, 900);
     SET(0,   0, 40);   SET(0,   0, 40);   SET(400, 0, 9);   SET(100, 0, 9);
@@ -299,20 +240,28 @@ void setup_settings(void) {
     SET(200, 0, 400);  SET(100, 0, 400);  SET(400, 0, 400); SET(0,   0, 0);
 
     // TRACK 2
+    assert(c == state->settings_count);
     current_track = &state->track2;
     state->track2.settings = malloc(state->settings_count * sizeof(Setting));
     assert(current_track->settings != NULL && "Uninitialized");
     c = 0;
 
-    SET(600,  4, 0); SET(603,  4, 0); SET(606,  4, 0); SET(609,  4, 0);
-    SET(612,  4, 0); SET(  0,  4, 0); SET(615,  4, 0); SET(  0,  4, 0);
-    SET(  0,  4, 0); SET(  0,  4, 0); SET(200,  4, 0); SET(  0,  4, 0);
-    SET(400,  4, 0); SET(  0,  4, 0); SET(400,  4, 0); SET(  0,  4, 0);
+    for (int i = 0; i < 4; i++) {
+        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
+        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
+        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
+        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
+    }
 
-    SET(600,  4, 0); SET(  0,  4, 0); SET(600,  4, 0); SET(  0,  4, 0);
-    SET(600,  4, 0); SET(  0,  4, 0); SET(  0,  4, 0); SET(  0,  4, 0);
-    SET(600,  4, 0); SET(603,  4, 0); SET(606,  4, 0); SET(609,  4, 0);
-    SET(400,  4, 0); SET(  0,  4, 0); SET(  0,  4, 0); SET(  0,  4, 0);
+    SET(  0,  0.01, 0); SET(  0,  0.05, 0); SET(  0,  0.05, 0); SET(  0,  0.05, 0);
+    SET(  0,  0.05, 0); SET(  0,  0.05, 0); SET(  0,  0.05, 0); SET(  0,  0.05, 0);
+    SET(  0,  0.10, 0); SET(  0,  0.10, 0); SET(400,  0.10, 0); SET(400,  0.10, 0);
+    SET(400,  10.0, 0); SET(  0,  10.0, 0); SET(400,  10.0, 0); SET(  0,  10.0, 0);
+
+    SET(400,  10.0, 0); SET(  0,  10.0, 0); SET(400,  10.0, 0); SET(  0,  10.0, 0);
+    SET(400,  0.10, 0); SET(  0,  0.10, 0); SET(  0,  0.10, 0); SET(  0,  0.10, 0);
+    SET(  0,  0.05, 0); SET(  0,  0.05, 0); SET(  0,  0.05, 0); SET(400,  0.05, 0);
+    SET(400,  10.0, 0); SET(  0,  10.0, 0); SET(400,  10.0, 0); SET(  0,  10.0, 0);
 
     SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
     SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
@@ -325,17 +274,20 @@ void setup_settings(void) {
     SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
 
     // TRACK 3
+    assert(c == state->settings_count);
     current_track = &state->track3;
     state->track3.settings = malloc(state->settings_count * sizeof(Setting));
     assert(current_track->settings != NULL && "Uninitialized");
     c = 0;
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 8; i++) {
         SET( 20, 50, 0); SET(0,  0, 0); SET(  0, 20, 0); SET(  0, 80, 0);
         SET( 20,  0, 0); SET(0,  0, 0); SET(  0,  0, 0); SET(  0,  0, 0);
         SET( 20, 20, 0); SET(0,  0, 0); SET(  0,  0, 0); SET(  0, 80, 0);
         SET( 50, 50, 0); SET(0,  0, 0); SET( 90,  0, 0); SET(  0,  0, 0);
     }
+
+    assert(c == state->settings_count);
 }
 
 void playback_reset(void) {
@@ -384,9 +336,19 @@ void plug_post_reload(void *old_state) {
     playback_reset();
 }
 
-void plug_update(void) {
-    char text[64] = {0};
+// UI
 
+void animate_ease_in(float *current, float start, float target, float elapsed, float duration) {
+    float t = elapsed / duration;
+    if (t >= 1.0f) {
+        *current = target;
+    } else {
+        *current = start + (target - start) * /* quad ease in */ (t * t);
+    }
+}
+
+void plug_update(void) {
+    char text[256] = {0};
     BeginDrawing();
     ClearBackground(BLACK);
 
@@ -398,53 +360,26 @@ void plug_update(void) {
         }
     }
 
-    int setting_position = (state->playback_frame_counter / FRAMES_PER_SETTING) % state->settings_count;
-    Setting setting_this_frame = state->track1.settings[setting_position];
+    int latency_adjustment = 850;
+    int setting_position = ((state->playback_frame_counter + latency_adjustment) / FRAMES_PER_SETTING) % state->settings_count;
 
-    float signal1 = sinf(state->track1.phases.wave1) * 0.5f + 0.5f;
-    float signal2 = sinf(state->track1.phases.wave2) * 0.5f + 0.5f;
+    { // TRACK 3 - the beat
+        Track track = state->track3;
+        float freq1 = track.settings[setting_position].wave1;
+        float freq2 = track.settings[setting_position].wave2;
 
-    Rectangle rec = { 200+400*signal1, 200+400*signal2, 50, 50 };
-    Color color = { signal1*255, signal2*255, 0, 255 };
-    DrawRectangleRec(rec, color);
+        state->ui.track3_target = 20 + (freq1 * 5);
+        animate_ease_in(&state->ui.track3_value, state->ui.track3_value, state->ui.track3_target, GetFrameTime(), 0.025f);
 
-    sprintf(text, "signal1 %f", signal1);
-    DrawText(text, 20, GetScreenHeight() - 50, 20, WHITE);
-
-    const int slider_width = 800;
-    int y = 10;
-
-    DrawSlider(0, 800, 1, &setting_this_frame.wave1, 1, ((Rectangle) { 10, y, slider_width, 10 }), BLUE);
-    sprintf(text, "%.0f Hz", setting_this_frame.wave1);
-    DrawText(text, slider_width + 20, y, 20, WHITE);
-    y += 15;
-    DrawSlider(0, 2*PI, 1, &state->track1.phases.wave1, 1, ((Rectangle) { 10, y, slider_width, 10 }), YELLOW);
-    sprintf(text, "%.3f", state->track1.phases.wave1/(2*PI));
-    DrawText(text, slider_width + 20, y, 20, WHITE);
-    y += 40;
-
-    DrawSlider(0, 10, 1, &setting_this_frame.wave2, 1, ((Rectangle) { 10, y, slider_width, 10 }), BLUE);
-    sprintf(text, "%.0f Hz", setting_this_frame.wave2);
-    DrawText(text, slider_width + 20, y, 20, WHITE);
-    y += 15;
-    DrawSlider(0, 2*PI, 1, &state->track1.phases.wave2, 1, ((Rectangle) { 10, y, slider_width, 10 }), YELLOW);
-    sprintf(text, "%.3f", state->track1.phases.wave2/(2*PI));
-    DrawText(text, slider_width + 20, y, 20, WHITE);
-    y += 40;
-
-    DrawSlider(0, 900, 1, &setting_this_frame.wave3, 1, ((Rectangle) { 10, y, slider_width, 10 }), BLUE);
-    sprintf(text, "%.0f Hz", setting_this_frame.wave3);
-    DrawText(text, slider_width + 20, y, 20, WHITE);
-    y += 15;
-    DrawSlider(0, 2*PI, 1, &state->track1.phases.wave3, 1, ((Rectangle) { 10, y, slider_width, 10 }), YELLOW);
-    sprintf(text, "%.3f", state->track1.phases.wave3/(2*PI));
-    DrawText(text, slider_width + 20, y, 20, WHITE);
-    y += 40;
-
-    sprintf(text, "Setting %d", setting_position);
-    DrawText(text, 20, GetScreenHeight() - 30, 20, WHITE);
+        DrawCircle(GetScreenWidth()/2, GetScreenHeight()/2, state->ui.track3_value, (Color) { 100+freq2, 0, 0, 255 });
+        sprintf(text, "%f - %f", state->ui.track3_target, state->ui.track3_value);
+        DrawText(text, 20, GetScreenHeight() - 70, 20, WHITE);
+    }
 
     DrawFPS(GetScreenWidth() - 100, GetScreenHeight() - 30);
+
+    sprintf(text, "%d", setting_position);
+    DrawText(text, 20, GetScreenHeight() - 30, 20, WHITE);
 
     EndDrawing();
 }
