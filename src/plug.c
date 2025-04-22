@@ -12,6 +12,9 @@
 
 #define FRAMES_PER_SETTING (SAMPLE_RATE / 5)
 
+#define VIDEO_WIDTH 1280
+#define VIDEO_HEIGHT 720
+
 // TODO: add lerp to settings
 
 typedef struct {
@@ -54,6 +57,8 @@ typedef struct {
 
     bool is_playing_sound;
     size_t playback_frame_counter;
+
+    bool is_rendering;
 } State;
 
 static State *state = NULL;
@@ -313,6 +318,7 @@ void plug_init(void) {
     memset(state, 0, sizeof(*state));
 
     setup_settings();
+    SetWindowSize(VIDEO_WIDTH, VIDEO_HEIGHT);
 
     init_audio_device();
     SetExitKey(KEY_Q);
@@ -358,6 +364,10 @@ void plug_update(void) {
         } else {
             playback_stop();
         }
+    }
+
+    if (IsKeyPressed(KEY_R)) {
+        state->is_rendering = true;
     }
 
     int latency_adjustment = 850;
