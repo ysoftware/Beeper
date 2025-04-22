@@ -13,5 +13,4 @@ build/*
 
 lib/raylib*/*.cmake
 lib/raylib*/Makefile
-lib/raylib*/examples
 lib/raylib*/raylib/*

@@ -35,7 +35,7 @@ else # macos
 				  $(f) Cocoa         $(f) GLUT         $(f) CoreFoundation $(f) AppKit
 endif
 
-all: build main.app build/libplug.so
+all: build main.app build/$(plug_name)
 
 clean_all:
 	@echo $(nproc)
@@ -57,7 +57,7 @@ build/libraylib.a:
 	cd $(raylib) && make raylib $(jobs)
 	cp $(raylib)/raylib/libraylib.a $(raylib_l)
 
-main.app: src/main.c
+main.app: src/main.c $(renderer_files)
 	$(compiler) $(warnings) -rdynamic -o main.app src/main.c $(all_i) $(renderer_l) $(frameworks)
 
 build/$(plug_name): $(all_l) $(renderer_files) src/*

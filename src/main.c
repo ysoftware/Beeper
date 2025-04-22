@@ -22,7 +22,14 @@ void (*plug_cleanup)(void);
 void* (*plug_pre_reload)(void);
 void (*plug_post_reload)(void*);
 
+#ifdef _WIN32
+char *library_path = ".\\build\\libplug.dll";
+#elif __APPLE__
+char *library_path = "./build/libplug.dylib";
+#else
 char *library_path = "./build/libplug.so";
+#endif
+
 char *library_lockfile_path = "./build/libplug.lock";
 time_t last_library_load_time = 0;
 
