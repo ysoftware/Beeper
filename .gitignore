@@ -10,6 +10,8 @@ build/*
 *.exp
 *.o
 *.tmp
+*.mp4
+*.wav
 
 lib/raylib*/*.cmake
 lib/raylib*/Makefile

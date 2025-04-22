@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "raylib.h"
+#include "ffmpeg_linux.c"
 
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
@@ -14,6 +15,7 @@
 
 #define VIDEO_WIDTH 1280
 #define VIDEO_HEIGHT 720
+#define VIDEO_FPS 60
 
 // TODO: add lerp to settings
 
@@ -41,8 +43,12 @@ typedef struct {
 } Track;
 
 typedef struct {
-    float track3_target;
-    float track3_value;
+    float track3_circle_size_target;
+    float track3_circle_size_value;
+        
+    float track3_circle_color_target;
+    float track3_circle_color_value;
+
 } UI;
 
 typedef struct {
@@ -58,7 +64,9 @@ typedef struct {
     bool is_playing_sound;
     size_t playback_frame_counter;
 
-    bool is_rendering;
+    FFMPEG *ffmpeg;
+    RenderTexture2D render_target;
+    float *audio_buffer;
 } State;
 
 static State *state = NULL;
@@ -148,7 +156,7 @@ void audio_callback(ma_device *device, void *output, const void *input, ma_uint3
     (void)device;
     (void)input;
 
-    if (!state->is_playing_sound) {
+    if (device != NULL && !state->is_playing_sound) {
         memset(output, 0, sizeof(float) * frames_count * NUMBER_OF_CHANNELS);
         return;
     }
@@ -317,11 +325,11 @@ void plug_init(void) {
     state = malloc(sizeof(*state));
     memset(state, 0, sizeof(*state));
 
-    setup_settings();
-    SetWindowSize(VIDEO_WIDTH, VIDEO_HEIGHT);
-
-    init_audio_device();
     SetExitKey(KEY_Q);
+    SetWindowSize(VIDEO_WIDTH, VIDEO_HEIGHT);
+    state->render_target = LoadRenderTexture(VIDEO_WIDTH, VIDEO_HEIGHT);
+    init_audio_device();
+    setup_settings();
 }
 
 void plug_cleanup(void) {
@@ -353,12 +361,29 @@ void animate_ease_in(float *current, float start, float target, float elapsed, f
     }
 }
 
+void DrawFrame(int setting_position, float delta_time) {
+    { // TRACK 3 - the beat
+        Track track = state->track3;
+        float freq1 = track.settings[setting_position].wave1;
+        float freq2 = track.settings[setting_position].wave2;
+
+        state->ui.track3_circle_size_target = 20 + (freq1 * 5);
+        state->ui.track3_circle_color_target = 200 + (freq2);
+
+        animate_ease_in(&state->ui.track3_circle_size_value, state->ui.track3_circle_size_value, state->ui.track3_circle_size_target, delta_time, 0.025f);
+        animate_ease_in(&state->ui.track3_circle_color_value, state->ui.track3_circle_color_value, state->ui.track3_circle_color_target, delta_time, 0.045f);
+
+        DrawCircle(GetScreenWidth()/2, GetScreenHeight()/2, 
+                state->ui.track3_circle_size_value, 
+                (Color) { state->ui.track3_circle_color_value, 0, 0, 255 });
+    }
+}
+
 void plug_update(void) {
     char text[256] = {0};
-    BeginDrawing();
-    ClearBackground(BLACK);
+    bool is_rendering = state->ffmpeg != NULL;
 
-    if (IsKeyPressed(KEY_SPACE)) {
+    if (!is_rendering && IsKeyPressed(KEY_SPACE)) {
         if (!state->is_playing_sound) {
             playback_play();
         } else {
@@ -366,31 +391,60 @@ void plug_update(void) {
         }
     }
 
-    if (IsKeyPressed(KEY_R)) {
-        state->is_rendering = true;
+    if (!is_rendering && IsKeyPressed(KEY_R)) {
+        playback_stop();
+
+        // render audio
+        state->playback_frame_counter = 0;
+        size_t buffer_size = sizeof(float) * state->settings_count * FRAMES_PER_SETTING * NUMBER_OF_CHANNELS;
+        state->audio_buffer = malloc(buffer_size);
+        audio_callback(NULL, state->audio_buffer, NULL, state->settings_count * FRAMES_PER_SETTING);
+
+        FFMPEG *audio_ffmpeg = ffmpeg_start_rendering_audio("output.wav");
+        ffmpeg_send_sound_samples(audio_ffmpeg, state->audio_buffer, buffer_size);
+        ffmpeg_end_rendering(audio_ffmpeg, false);
+
+        // render video
+        state->playback_frame_counter = 0;
+        state->ffmpeg = ffmpeg_start_rendering_video("output.mp4", VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS);
+        SetTargetFPS(500);
     }
 
-    int latency_adjustment = 850;
+    BeginDrawing();
+    ClearBackground(BLACK);
+
+    int latency_adjustment = state->ffmpeg == NULL ? 850 : 0;
     int setting_position = ((state->playback_frame_counter + latency_adjustment) / FRAMES_PER_SETTING) % state->settings_count;
 
-    { // TRACK 3 - the beat
-        Track track = state->track3;
-        float freq1 = track.settings[setting_position].wave1;
-        float freq2 = track.settings[setting_position].wave2;
+    BeginTextureMode(state->render_target);
+    ClearBackground(BLACK);
+    DrawFrame(setting_position, is_rendering ? (float)1/VIDEO_FPS : GetFrameTime());
+    EndTextureMode();
 
-        state->ui.track3_target = 20 + (freq1 * 5);
-        animate_ease_in(&state->ui.track3_value, state->ui.track3_value, state->ui.track3_target, GetFrameTime(), 0.025f);
+    DrawTexture(state->render_target.texture, 0, 0, WHITE);
 
-        DrawCircle(GetScreenWidth()/2, GetScreenHeight()/2, state->ui.track3_value, (Color) { 100+freq2, 0, 0, 255 });
-        sprintf(text, "%f - %f", state->ui.track3_target, state->ui.track3_value);
-        DrawText(text, 20, GetScreenHeight() - 70, 20, WHITE);
+    if (state->is_playing_sound) {
+        sprintf(text, "%d", setting_position);
+        DrawText(text, 20, GetScreenHeight() - 30, 20, WHITE);
+    }
+
+    if (is_rendering) {
+        DrawText(text, 20, GetScreenHeight() - 30, 20, WHITE);
+
+        Image image = LoadImageFromTexture(state->render_target.texture);
+        if (!ffmpeg_send_frame_flipped(state->ffmpeg, image.data, image.width, image.height)) {
+            ffmpeg_end_rendering(state->ffmpeg, true);
+            state->ffmpeg = NULL;
+        }
+
+        state->playback_frame_counter += SAMPLE_RATE / VIDEO_FPS;
+        if (state->playback_frame_counter >= state->settings_count * FRAMES_PER_SETTING) {
+            ffmpeg_end_rendering(state->ffmpeg, false);
+            SetTargetFPS(90);
+        }
     }
 
     DrawFPS(GetScreenWidth() - 100, GetScreenHeight() - 30);
-
-    sprintf(text, "%d", setting_position);
-    DrawText(text, 20, GetScreenHeight() - 30, 20, WHITE);
-
     EndDrawing();
 }
 

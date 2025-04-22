@@ -117,12 +117,12 @@ FFMPEG *ffmpeg_start_rendering_audio(const char *output_path)
             "-loglevel", "verbose",
             "-y",
 
-            "-f", "s16le",
-            "-sample_rate", "44100",
-            "-channels", "2",
+            "-f", "f32le",
+            "-ar", "44100",
+            "-ac", "2",
             "-i", "-",
 
-            "-c:a", "pcm_s16le",
+            "-c:a", "pcm_f32le",
             output_path,
 
             NULL
