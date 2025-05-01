@@ -43,12 +43,19 @@ typedef struct {
 } Track;
 
 typedef struct {
+    float track1_circle_position;
+
+    float track2_color_r_target;
+    float track2_color_r_value;
+    float track2_color_g_target;
+    float track2_color_g_value;
+    float track2_color_b_target;
+    float track2_color_b_value;
+
     float track3_circle_size_target;
     float track3_circle_size_value;
-        
     float track3_circle_color_target;
     float track3_circle_color_value;
-
 } UI;
 
 typedef struct {
@@ -111,7 +118,8 @@ float track1_produce_sample(Track *track, int setting_position) {
 float track2_produce_sample(Track *track, int setting_position) {
     float signal1 = sine_wave(track->phases.wave1);
     float signal2 = square_wave(track->phases.wave2) * 0.5f + 0.5f;
-    float value = signal1 * signal2;
+    float signal3 = square_wave(track->phases.wave3) * 0.5f + 0.5f;
+    float value = signal1 * signal2 * signal3;
 
     // produce next phase value
 
@@ -219,38 +227,33 @@ void setup_settings(void) {
         state->track3.settings = NULL;
     }
 
-    // TRACK 1
+    // TRACK 1 - BASS
     Track *current_track = &state->track1;
     state->track1.settings = malloc(state->settings_count * sizeof(Setting));
     assert(current_track->settings != NULL && "Uninitialized");
     size_t c = 0;
 
-    for (int i = 0; i < 4; i++) {
-        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
-        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
-        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
-        SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
+    for (int i = 0; i < 2; i++) {
+        SET(200, 0, 60);   SET(200, 0, 70);   SET(200, 0, 80);  SET(100, 0, 900);
+        SET(0,   0, 40);   SET(0,   0, 40);   SET(400, 0, 9);   SET(100, 0, 9);
+        SET(200, 0, 600);  SET(200, 0, 70);   SET(200, 0, 80);  SET(900, 0, 0);
+        SET(200, 0, 0);    SET(100, 0, 0);    SET(600, 0, 0);   SET(0,   0, 0);
+
+        SET(200, 0, 600);  SET(200, 0, 700);  SET(200, 0, 80);  SET(100, 0, 90);
+        SET(0,   0, 0);    SET(0,   0, 0);    SET(400, 0, 0);   SET(100, 0, 0);
+        SET(200, 0, 600);  SET(200, 0, 700);  SET(200, 0, 80);  SET(200, 0, 90);
+        SET(200, 0, 0);    SET(100, 0, 0);    SET(400, 0, 0);   SET(0,   0, 0);
+
+        SET(200, 0, 60);   SET(200, 0, 70);   SET(200, 0, 80);  SET(100, 0, 900);
+        SET(0,   0, 0);    SET(0,   0, 0);    SET(400, 0, 900); SET(100, 0, 900);
+        SET(200, 0, 600);  SET(200, 0, 70);   SET(200, 0, 80);  SET(900, 0, 0);
+        SET(200, 0, 0);    SET(100, 0, 0);    SET(600, 0, 0);   SET(0,   0, 0);
+
+        SET(200, 0, 600);  SET(200, 0, 700);  SET(200, 0, 80);  SET(100, 0, 90);
+        SET(0,   0, 40);   SET(0,   0, 40);   SET(400, 0, 9);   SET(100, 0, 9);
+        SET(200, 0, 600);  SET(200, 0, 700);  SET(200, 0, 80);  SET(200, 0, 90);
+        SET(200, 0, 400);  SET(100, 0, 400);  SET(400, 0, 400); SET(0,   0, 0);
     }
-
-    SET(200, 0, 60);   SET(200, 0, 70);   SET(200, 0, 80);  SET(100, 0, 900);
-    SET(0,   0, 40);   SET(0,   0, 40);   SET(400, 0, 9);   SET(100, 0, 9);
-    SET(200, 0, 600);  SET(200, 0, 70);   SET(200, 0, 80);  SET(900, 0, 0);
-    SET(200, 0, 0);    SET(100, 0, 0);    SET(600, 0, 0);   SET(0,   0, 0);
-
-    SET(200, 0, 600);  SET(200, 0, 700);  SET(200, 0, 80);  SET(100, 0, 90);
-    SET(0,   0, 0);    SET(0,   0, 0);    SET(400, 0, 0);   SET(100, 0, 0);
-    SET(200, 0, 600);  SET(200, 0, 700);  SET(200, 0, 80);  SET(200, 0, 90);
-    SET(200, 0, 0);    SET(100, 0, 0);    SET(400, 0, 0);   SET(0,   0, 0);
-
-    SET(200, 0, 60);   SET(200, 0, 70);   SET(200, 0, 80);  SET(100, 0, 900);
-    SET(0,   0, 0);    SET(0,   0, 0);    SET(400, 0, 900); SET(100, 0, 900);
-    SET(200, 0, 600);  SET(200, 0, 70);   SET(200, 0, 80);  SET(900, 0, 0);
-    SET(200, 0, 0);    SET(100, 0, 0);    SET(600, 0, 0);   SET(0,   0, 0);
-
-    SET(200, 0, 600);  SET(200, 0, 700);  SET(200, 0, 80);  SET(100, 0, 90);
-    SET(0,   0, 40);   SET(0,   0, 40);   SET(400, 0, 9);   SET(100, 0, 9);
-    SET(200, 0, 600);  SET(200, 0, 700);  SET(200, 0, 80);  SET(200, 0, 90);
-    SET(200, 0, 400);  SET(100, 0, 400);  SET(400, 0, 400); SET(0,   0, 0);
 
     // TRACK 2
     assert(c == state->settings_count);
@@ -271,22 +274,22 @@ void setup_settings(void) {
     SET(  0,  0.10, 0); SET(  0,  0.10, 0); SET(400,  0.10, 0); SET(400,  0.10, 0);
     SET(400,  10.0, 0); SET(  0,  10.0, 0); SET(400,  10.0, 0); SET(  0,  10.0, 0);
 
+    SET(400,  10.0,  0); SET(  0,  10.0,  0); SET(400,  10.0, 0); SET(  0,  10.0, 0);
+    SET(400,  0.10, 20); SET(  0,  0.10,  0); SET(  0,  0.10, 0); SET(  0,  0.10, 0);
+    SET(  0,  0.05, 20); SET(  0,  0.05,  0); SET(  0,  0.05, 0); SET(400,  0.05, 0);
+    SET(400,  10.0, 20); SET(  0,  10.0, 20); SET(400,  10.0, 0); SET(  0,  10.0, 0);
+
+    SET(  0,  0.01, 0); SET(  0,  0.05, 0); SET(  0,  0.05, 0); SET(  0,  0.05, 0);
+    SET(  0,  0.05, 0); SET(  0,  0.05, 0); SET(  0,  0.05, 0); SET(  0,  0.05, 0);
+    SET(  0,  0.10, 0); SET(  0,  0.10, 0); SET(400,  0.10, 0); SET(400,  0.10, 0);
     SET(400,  10.0, 0); SET(  0,  10.0, 0); SET(400,  10.0, 0); SET(  0,  10.0, 0);
-    SET(400,  0.10, 0); SET(  0,  0.10, 0); SET(  0,  0.10, 0); SET(  0,  0.10, 0);
-    SET(  0,  0.05, 0); SET(  0,  0.05, 0); SET(  0,  0.05, 0); SET(400,  0.05, 0);
-    SET(400,  10.0, 0); SET(  0,  10.0, 0); SET(400,  10.0, 0); SET(  0,  10.0, 0);
 
-    SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
-    SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
-    SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
-    SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
+    SET(400,  10.0,  0); SET(  0,  10.0,  0); SET(400,  10.0, 0); SET(  0,  10.0, 0);
+    SET(400,  0.10, 20); SET(  0,  0.10,  0); SET(  0,  0.10, 0); SET(  0,  0.10, 0);
+    SET(  0,  0.05, 20); SET(  0,  0.05,  0); SET(  0,  0.05, 0); SET(400,  0.05, 0);
+    SET(400,  10.0, 20); SET(  0,  10.0, 20); SET(400,  10.0, 0); SET(  0,  10.0, 0);
 
-    SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
-    SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
-    SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
-    SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0); SET(0, 0, 0);
-
-    // TRACK 3
+    // TRACK 3 - BEAT
     assert(c == state->settings_count);
     current_track = &state->track3;
     state->track3.settings = malloc(state->settings_count * sizeof(Setting));
@@ -352,17 +355,63 @@ void plug_post_reload(void *old_state) {
 
 // UI
 
-void animate_ease_in(float *current, float start, float target, float elapsed, float duration) {
+void animate_ease_in(float *current, float target, float elapsed, float duration) {
     float t = elapsed / duration;
     if (t >= 1.0f) {
         *current = target;
     } else {
-        *current = start + (target - start) * /* quad ease in */ (t * t);
+        *current = *current + (target - *current) * /* quad ease in */ (t * t);
     }
 }
 
 void DrawFrame(int setting_position, float delta_time) {
-    { // TRACK 3 - the beat
+    { // TRACK 1 - BASS
+        Track track = state->track1;
+        float freq1 = track.settings[setting_position].wave1;
+        float freq2 = track.settings[setting_position].wave2;
+        float freq3 = track.settings[setting_position].wave3;
+
+        state->ui.track2_color_r_target = 0.2 * freq1;
+        state->ui.track2_color_g_target = freq2;
+        state->ui.track2_color_b_target = 0.4 * freq1 + freq2;
+
+        float duration = 0.04f + 0.015f * freq3;
+        animate_ease_in(&state->ui.track2_color_r_value, state->ui.track2_color_r_target, delta_time, duration);
+        animate_ease_in(&state->ui.track2_color_g_value, state->ui.track2_color_g_target, delta_time, duration);
+        animate_ease_in(&state->ui.track2_color_b_value, state->ui.track2_color_b_target, delta_time, duration);
+
+        Color color = {
+            state->ui.track2_color_r_value,
+            state->ui.track2_color_g_value,
+            state->ui.track2_color_b_value,
+            100
+        };
+        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), color);
+    }
+
+    { // TRACK 2 - BEEPS
+        Track track = state->track2;
+        float freq1 = track.settings[setting_position].wave1;
+        float freq2 = track.settings[setting_position].wave2;
+        float freq3 = track.settings[setting_position].wave3;
+
+        if (freq1 > 0) {
+            DrawRing(
+                (Vector2) { (float)GetScreenWidth()/2, (float)GetScreenHeight()/2 },
+                40 * freq2,
+                40 * freq2 + 700,
+                ((10 + freq3) * setting_position) + state->ui.track1_circle_position,
+                ((10 + freq3) * setting_position) + state->ui.track1_circle_position + 10,
+                50,
+                WHITE
+            );
+        }
+
+        state->ui.track1_circle_position += freq1;
+    }
+
+
+    { // TRACK 3 - BEAT
         Track track = state->track3;
         float freq1 = track.settings[setting_position].wave1;
         float freq2 = track.settings[setting_position].wave2;
@@ -370,12 +419,12 @@ void DrawFrame(int setting_position, float delta_time) {
         state->ui.track3_circle_size_target = 20 + (freq1 * 5);
         state->ui.track3_circle_color_target = 200 + (freq2);
 
-        animate_ease_in(&state->ui.track3_circle_size_value, state->ui.track3_circle_size_value, state->ui.track3_circle_size_target, delta_time, 0.025f);
-        animate_ease_in(&state->ui.track3_circle_color_value, state->ui.track3_circle_color_value, state->ui.track3_circle_color_target, delta_time, 0.045f);
+        animate_ease_in(&state->ui.track3_circle_size_value, state->ui.track3_circle_size_target, delta_time, 0.025f);
+        animate_ease_in(&state->ui.track3_circle_color_value, state->ui.track3_circle_color_target, delta_time, 0.045f);
 
         DrawCircle(GetScreenWidth()/2, GetScreenHeight()/2, 
-                state->ui.track3_circle_size_value, 
-                (Color) { state->ui.track3_circle_color_value, 0, 0, 255 });
+            state->ui.track3_circle_size_value, 
+            (Color) { state->ui.track3_circle_color_value, 0, 0, 255 });
     }
 }
 
